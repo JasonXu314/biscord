@@ -1,0 +1,90 @@
+<script lang="ts">
+	export let color: 'red' | 'blue' | 'green' | 'yellow';
+	export let hint: string | undefined = undefined;
+</script>
+
+<div class="main">
+	<button class={`button ${color}`} on:click><slot /></button>
+	{#if hint}
+		<div class="tooltip">{hint}</div>
+	{/if}
+</div>
+
+<style lang="scss">
+	$red: #cc4444;
+	$blue: #19a1e6;
+	$green: #44aa44;
+	$yellow: #ddcc00;
+
+	.main {
+		position: relative;
+		display: inline-block;
+		margin-top: 0.5em;
+
+		.button {
+			padding: 0.5em 1em;
+			color: white;
+			border-radius: 6px;
+			transition: all 250ms ease-in-out;
+
+			@each $colorName, $color in ('red': $red, 'blue': $blue, 'green': $green, 'yellow': $yellow) {
+				&.#{$colorName} {
+					background-color: $color;
+					border: 1px solid lighten($color, 10%);
+					box-shadow: transparentize(lighten($color, 10%), 0.6) 0 2px 3px;
+				}
+			}
+
+			&:not(:disabled) {
+				cursor: pointer;
+			}
+
+			&:not(:disabled):hover,
+			&:not(:disabled):active {
+				transition: all 250ms ease-in-out;
+
+				@each $colorName, $color in ('red': $red, 'blue': $blue, 'green': $green, 'yellow': $yellow) {
+					&.#{$colorName} {
+						background-color: darken($color, 10%);
+						border: 1px solid $color;
+						box-shadow: transparentize($color, 0.6) 0px 2px 3px, lighten($color, 80%) 0 0 3px;
+					}
+				}
+			}
+		}
+
+		.tooltip {
+			opacity: 0;
+			position: absolute;
+			padding: 0.25em 0.5em;
+			max-width: 150%;
+			width: max-content;
+			top: 150%;
+			left: 50%;
+			transform: translateX(-50%);
+			text-align: center;
+			background-color: rgba(black, 0.75);
+			color: white;
+			transition: all 250ms ease-in-out;
+			transition-delay: 250ms;
+			z-index: 99;
+
+			&::after {
+				content: '';
+				position: absolute;
+				left: 50%;
+				transform: translateX(-50%);
+				top: -16px;
+				border-top: 8px solid transparent;
+				border-right: 8px solid transparent;
+				border-bottom: 8px solid rgba(0, 0, 0, 0.75);
+				border-left: 8px solid transparent;
+			}
+		}
+
+		.button:hover ~ .tooltip {
+			opacity: 1;
+			transition: all 250ms ease-in-out;
+		}
+	}
+</style>
