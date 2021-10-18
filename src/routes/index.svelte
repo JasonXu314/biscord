@@ -68,6 +68,7 @@
 
 				socket.on('USER_JOIN', (msg) => {
 					users = [...users, msg.user];
+					idsToUsers.set(msg.user.id, msg.user);
 				});
 
 				socket.on('USER_LEAVE', (msg) => {
