@@ -2,25 +2,56 @@
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import { BACKEND_URL } from '$lib/env';
-	import MySocket from '$lib/sock';
+	import { Socket } from '@nano-utils/web-socket';
 	import axios, { AxiosResponse } from 'axios';
+	import { onMount } from 'svelte';
 
 	let fileInput: HTMLInputElement,
 		name: string = '',
 		avatar: string | null = null,
 		me: User | null = null,
-		socket: MySocket<InboundSocketMsg, OutboundSocketMsg> | null = null,
+		socket: Socket<InboundSocketMsg, OutboundSocketMsg> | null = null,
 		messages: Message[],
 		newMsg: string = '',
-		users: User[];
+		users: User[],
+		idsToUsers: Map<string, User>,
+		db: IDBDatabase,
+		messageBoard: HTMLDivElement,
+		inputRow: HTMLDivElement,
+		overflowing: boolean = false;
+
+	onMount(() => {
+		const req = indexedDB.open('biscord:user-data');
+
+		req.addEventListener('upgradeneeded', () => {
+			if (!req.transaction.db.objectStoreNames.contains('user')) {
+				req.transaction.db.createObjectStore('user');
+			}
+		});
+
+		req.addEventListener('success', () => {
+			db = req.result;
+
+			const dataReq = db.transaction('user').objectStore('user').getAll(['name', 'avatar']);
+
+			dataReq.addEventListener('success', () => {
+				name = dataReq.result[0] || '';
+				avatar = dataReq.result[1] || null;
+			});
+		});
+	});
+
+	$: if (db) db.transaction('user', 'readwrite').objectStore('user').put(name, 'name');
+	$: if (db) db.transaction('user', 'readwrite').objectStore('user').put(avatar, 'avatar');
 
 	function join() {
-		if (name && avatar) {
+		if (name.trim()) {
 			axios.post<LoginBody, AxiosResponse<LoginResponse>>(`${BACKEND_URL}/login`, { name, avatar }).then((res) => {
 				me = res.data.user;
 				messages = res.data.messages;
 				users = res.data.users;
-				socket = new MySocket<InboundSocketMsg, OutboundSocketMsg>(BACKEND_URL.replace('http', 'ws'));
+				idsToUsers = new Map(users.map((user) => [user.id, user]));
+				socket = new Socket<InboundSocketMsg, OutboundSocketMsg>(BACKEND_URL.replace('http', 'ws'));
 
 				socket.send({ type: 'CONNECT', id: me.id, name });
 
@@ -31,7 +62,7 @@
 
 				socket.on('MESSAGE', (msg) => {
 					messages = [...messages, msg.message];
-					console.log(messages);
+					recalculateSize();
 				});
 
 				socket.on('USER_JOIN', (msg) => {
@@ -60,29 +91,39 @@
 	}
 
 	function send() {
-		socket.send({ type: 'MESSAGE', message: newMsg });
-		newMsg = '';
+		if (newMsg.trim()) {
+			socket.send({ type: 'MESSAGE', message: newMsg });
+			newMsg = '';
+		}
+	}
+
+	function recalculateSize() {
+		const mbHeight = Number(getComputedStyle(messageBoard).height.slice(0, -2));
+		const irHeight = Number(getComputedStyle(inputRow).height.slice(0, -2));
+		if (mbHeight >= window.innerHeight - irHeight) {
+			overflowing = true;
+		}
 	}
 </script>
 
 {#if me}
 	<div class="app">
-		<div class="message-board">
-			<div class="input-row">
-				<Input bind:value={newMsg} label="Message" onEnter={send} />
-				<Button color="blue" on:click={send}>Send</Button>
-			</div>
+		<div class="message-board" bind:this={messageBoard} class:scroll={overflowing}>
 			{#each messages as message}
 				<div class="message">
 					<div>
-						<img src={message.author.avatar} alt={message.author.name} class="avatar" />
+						<img src={idsToUsers.get(message.author).avatar} alt={idsToUsers.get(message.author).name} class="avatar" />
 					</div>
 					<div class="text">
-						<h4 class="name">{message.author.name}</h4>
+						<h4 class="name">{idsToUsers.get(message.author).name}</h4>
 						<span class="message-text">{message.rawContent}</span>
 					</div>
 				</div>
 			{/each}
+			<div class="input-row" bind:this={inputRow}>
+				<Input bind:value={newMsg} label="Message" onEnter={send} />
+				<Button color="blue" on:click={send}>Send</Button>
+			</div>
 		</div>
 		<div class="user-list">
 			{#each users as user}
@@ -98,7 +139,9 @@
 {:else}
 	<Input bind:value={name} label="Name" />
 	<input type="file" bind:this={fileInput} on:change={setAvatar} />
-	<Button color="green" on:click={join}>Join</Button>
+	<div>
+		<Button color="green" on:click={join}>Join</Button>
+	</div>
 {/if}
 
 <style lang="scss">
@@ -107,9 +150,17 @@
 		grid-template-columns: 4fr 1fr;
 
 		.message-board {
+			max-height: 100vh;
+			box-sizing: border-box;
+			padding: 1em;
+			padding-bottom: 0;
+
 			.input-row {
 				display: flex;
 				flex-direction: row;
+				position: sticky;
+				bottom: 0;
+				background: white;
 			}
 
 			.message {
@@ -135,6 +186,14 @@
 					}
 				}
 			}
+
+			&.scroll {
+				overflow-y: scroll;
+
+				&::-webkit-scrollbar {
+					width: 0;
+				}
+			}
 		}
 
 		.user-list {
@@ -153,5 +212,9 @@
 				}
 			}
 		}
+	}
+
+	:global(body) {
+		margin: 0;
 	}
 </style>

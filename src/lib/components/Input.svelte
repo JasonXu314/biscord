@@ -7,7 +7,7 @@
 <div class="main">
 	<input
 		class="input"
-		class:contentful={value !== ''}
+		class:contentful={value.trim() !== ''}
 		id={`input-${label.replace(' ', '-').toLowerCase()}`}
 		type="text"
 		autocomplete="off"

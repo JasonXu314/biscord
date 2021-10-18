@@ -13,12 +13,6 @@ type InboundSocketMsg = {
 	USER_LEAVE: UserLeaveMsg;
 };
 
-type EvtListener<T = undefined> = (...evt: T extends undefined ? [] : [T]) => void;
-type Unsubscriber = () => void;
-type ListenerMap<T extends Record<string, any>> = {
-	[E in keyof T]: EvtListener<T[E]>[];
-};
-
 type User = {
 	name: string;
 	id: string;
@@ -33,7 +27,7 @@ type LoginBody = {
 type Message = {
 	rawContent: string;
 	id: string;
-	author: User;
+	author: string;
 };
 
 type LoginResponse = {
