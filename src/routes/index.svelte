@@ -47,6 +47,7 @@
 	function join() {
 		if (name.trim()) {
 			axios.post<LoginBody, AxiosResponse<LoginResponse>>(`${BACKEND_URL}/login`, { name, avatar }).then((res) => {
+				console.log(res);
 				me = res.data.user;
 				messages = res.data.messages;
 				users = res.data.users;
